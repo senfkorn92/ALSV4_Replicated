@@ -7,6 +7,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ALSCharacterMovementComponent.generated.h"
 
+class AALS_BaseCharacter;
+
 /**
  * Authoritative networked Character Movement
  */
@@ -29,7 +31,8 @@ class ADVANCEDLOCOMOTIONSYSTEMV_API UALSCharacterMovementComponent : public UCha
 		virtual void PrepMoveFor(class ACharacter* Character) override;
 
 		// Walk Speed Update
-		uint8 bSavedRequestMovementSettingsChange : 1;
+		uint8 bSavedRequestMaxWalkSpeedChange : 1;
+		float SavedNewMaxWalkSpeed = 0.f;
 	};
 
 	class FNetworkPredictionData_Client_My : public FNetworkPredictionData_Client_Character
@@ -43,35 +46,47 @@ class ADVANCEDLOCOMOTIONSYSTEMV_API UALSCharacterMovementComponent : public UCha
 	};
 
 public:
-
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual class FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	void OnMovementUpdated(float DeltaTime, const FVector& OldLocation, const FVector& OldVelocity);
 
+	// Movement Settings Override
+	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
+	virtual float GetMaxAcceleration() const override;
+	virtual float GetMaxBrakingDeceleration() const override;
+
+	// Set Movement Curve (Called in every instance)
+	UFUNCTION(BlueprintCallable, Category = "Movement Settings")
+	float GetMappedSpeed() const;
 
 	// Movement Settings Variables
-	uint8 bRequestMovementSettingsChange : 1;
+	UPROPERTY()
+	uint8 bRequestMaxWalkSpeedChange : 1;
 
-	float MyNewBraking;
-	float MyNewGroundFriction;
-	float MyNewMaxWalkSpeed;
-	float MyNewMaxAcceleration;
+	UPROPERTY()
+	UCurveVector* MovementCurve = nullptr;
 
-	float RealBraking;
-	float RealGroundFriction;
-	float RealMaxAcceleration;
+	UPROPERTY()
+	float LocWalkSpeed = 0.f;
+
+	UPROPERTY()
+	float LocRunSpeed = 0.f;
+		
+	UPROPERTY()
+	float LocSprintSpeed = 0.f;
+
+	UPROPERTY()
+	float NewMaxWalkSpeed = 0.f;
 
 	// Set Max Walking Speed (Called from the owning client)
 	UFUNCTION(BlueprintCallable, Category = "Movement Settings")
-	void SetMaxWalkingSpeed(float NewMaxWalkSpeed);
+	void SetMaxWalkingSpeed(float UpdateMaxWalkSpeed);
 
 	UFUNCTION(reliable, Server, WithValidation)
-	void Server_SetMaxWalkingSpeed(const float NewMaxWalkSpeed);
+	void Server_SetMaxWalkingSpeed(const float UpdateMaxWalkSpeed);
 
 	// Set Movement Settings (Called from the owning client)
 	UFUNCTION(BlueprintCallable, Category = "Movement Settings")
-	void SetMovementSettings(FVector NewMovementSettings);
-
-	UFUNCTION(reliable, Server, WithValidation)
-	void Server_SetMovementSettings(const FVector NewMovementSettings);
+	void SetMovementSettings(UCurveVector* NewMovementCurve, float NewLocWalkSpeed,
+							 float NewLocRunSpeed, float NewLocSprintSpeed);
 };
